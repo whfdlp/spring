@@ -1455,6 +1455,7 @@ public class BeanDefinitionParserDelegate {
 		return handler.parse(ele, new ParserContext(this.readerContext, this, containingBd));
 	}
 
+
 	/**
 	 * Decorate the given bean definition through a namespace handler, if applicable.
 	 * @param ele the current element
