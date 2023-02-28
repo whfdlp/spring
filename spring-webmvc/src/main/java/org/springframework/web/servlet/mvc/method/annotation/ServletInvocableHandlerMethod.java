@@ -101,10 +101,12 @@ public class ServletInvocableHandlerMethod extends InvocableHandlerMethod {
 	 */
 	public void invokeAndHandle(ServletWebRequest webRequest, ModelAndViewContainer mavContainer,
 			Object... providedArgs) throws Exception {
-
+        //执行调用
 		Object returnValue = invokeForRequest(webRequest, mavContainer, providedArgs);
+		//如果Controller对应的方法设置了@ResponseStatus，就设置response的status状态，没有就不处理，一般都不需要额外设置的
 		setResponseStatus(webRequest);
 
+		//如果没有返回值就不需要封装，直接返回
 		if (returnValue == null) {
 			if (isRequestNotModified(webRequest) || getResponseStatus() != null || mavContainer.isRequestHandled()) {
 				disableContentCachingIfNecessary(webRequest);
@@ -112,14 +114,16 @@ public class ServletInvocableHandlerMethod extends InvocableHandlerMethod {
 				return;
 			}
 		}
+		//如果设置有原因，直接返回
 		else if (StringUtils.hasText(getResponseStatusReason())) {
 			mavContainer.setRequestHandled(true);
 			return;
 		}
-
+        //默认为false，如果有@ResponseStatus设置，则为true
 		mavContainer.setRequestHandled(false);
 		Assert.state(this.returnValueHandlers != null, "No return value handlers");
 		try {
+			//解析返回的数据
 			this.returnValueHandlers.handleReturnValue(
 					returnValue, getReturnValueType(returnValue), mavContainer, webRequest);
 		}
@@ -135,6 +139,7 @@ public class ServletInvocableHandlerMethod extends InvocableHandlerMethod {
 	 * Set the response status according to the {@link ResponseStatus} annotation.
 	 */
 	private void setResponseStatus(ServletWebRequest webRequest) throws IOException {
+
 		HttpStatus status = getResponseStatus();
 		if (status == null) {
 			return;

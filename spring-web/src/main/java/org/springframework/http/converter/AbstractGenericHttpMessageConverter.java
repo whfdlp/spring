@@ -83,7 +83,7 @@ public abstract class AbstractGenericHttpMessageConverter<T> extends AbstractHtt
 	@Override
 	public final void write(final T t, @Nullable final Type type, @Nullable MediaType contentType,
 			HttpOutputMessage outputMessage) throws IOException, HttpMessageNotWritableException {
-
+		//获取
 		final HttpHeaders headers = outputMessage.getHeaders();
 		addDefaultHeaders(headers, t, contentType);
 

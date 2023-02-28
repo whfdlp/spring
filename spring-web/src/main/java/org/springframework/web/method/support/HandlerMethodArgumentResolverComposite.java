@@ -112,12 +112,14 @@ public class HandlerMethodArgumentResolverComposite implements HandlerMethodArgu
 	@Nullable
 	public Object resolveArgument(MethodParameter parameter, @Nullable ModelAndViewContainer mavContainer,
 			NativeWebRequest webRequest, @Nullable WebDataBinderFactory binderFactory) throws Exception {
-
+        //获取一个支持HandlerMethodArgument解析的的解析器，
+		//我们Controller处理方法使用@RequestBody接受请求，所以对应RequestResponseBodyMethodProcessor
 		HandlerMethodArgumentResolver resolver = getArgumentResolver(parameter);
 		if (resolver == null) {
 			throw new IllegalArgumentException("Unsupported parameter type [" +
 					parameter.getParameterType().getName() + "]. supportsParameter should be called first.");
 		}
+		//RequestResponseBodyMethodProcessor开始解析
 		return resolver.resolveArgument(parameter, mavContainer, webRequest, binderFactory);
 	}
 

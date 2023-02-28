@@ -218,7 +218,8 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 
 
 	/**
-	 * Derive further bean definitions from the configuration classes in the registry.
+	 * 从bean工厂中的configuration配置类中获取更多的beanDefinitions,
+	 * 也就是通过有@configuration注解的配置类中扫描并注册beanDefinitions
 	 */
 	@Override
 	public void postProcessBeanDefinitionRegistry(BeanDefinitionRegistry registry) {
@@ -237,8 +238,8 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 	}
 
 	/**
-	 * Prepare the Configuration classes for servicing bean requests at runtime
-	 * by replacing them with CGLIB-enhanced subclasses.
+	 * 1、扫描并注册beanDefinitions
+	 * 2、对配置类进行CGLIB代理，并替换掉BeanDefinition的beanClass属性
 	 */
 	@Override
 	public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) {
@@ -249,8 +250,7 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 		}
 		this.factoriesPostProcessed.add(factoryId);
 		if (!this.registriesPostProcessed.contains(factoryId)) {
-			// BeanDefinitionRegistryPostProcessor hook apparently not supported...
-			// Simply call processConfigurationClasses lazily at this point then.
+			//扫描并注册beanDefinitions
 			processConfigBeanDefinitions((BeanDefinitionRegistry) beanFactory);
 		}
 
@@ -265,7 +265,6 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 	public void processConfigBeanDefinitions(BeanDefinitionRegistry registry) {
 		List<BeanDefinitionHolder> configCandidates = new ArrayList<>();
 		String[] candidateNames = registry.getBeanDefinitionNames();
-
 		for (String beanName : candidateNames) {
 			BeanDefinition beanDef = registry.getBeanDefinition(beanName);
 			if (beanDef.getAttribute(ConfigurationClassUtils.CONFIGURATION_CLASS_ATTRIBUTE) != null) {
@@ -277,20 +276,14 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 				configCandidates.add(new BeanDefinitionHolder(beanDef, beanName));
 			}
 		}
-
-		// Return immediately if no @Configuration classes were found
 		if (configCandidates.isEmpty()) {
 			return;
 		}
-
-		// Sort by previously determined @Order value, if applicable
 		configCandidates.sort((bd1, bd2) -> {
 			int i1 = ConfigurationClassUtils.getOrder(bd1.getBeanDefinition());
 			int i2 = ConfigurationClassUtils.getOrder(bd2.getBeanDefinition());
 			return Integer.compare(i1, i2);
 		});
-
-		// Detect any custom bean name generation strategy supplied through the enclosing application context
 		SingletonBeanRegistry sbr = null;
 		if (registry instanceof SingletonBeanRegistry) {
 			sbr = (SingletonBeanRegistry) registry;
@@ -303,34 +296,30 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 				}
 			}
 		}
-
 		if (this.environment == null) {
 			this.environment = new StandardEnvironment();
 		}
-
-		// Parse each @Configuration class
 		ConfigurationClassParser parser = new ConfigurationClassParser(
 				this.metadataReaderFactory, this.problemReporter, this.environment,
 				this.resourceLoader, this.componentScanBeanNameGenerator, registry);
-
 		Set<BeanDefinitionHolder> candidates = new LinkedHashSet<>(configCandidates);
 		Set<ConfigurationClass> alreadyParsed = new HashSet<>(configCandidates.size());
 		do {
+            //解析配置类并注册相关beanDefinitions，比如@Configuration,@Controller,@Service,@Component等
 			parser.parse(candidates);
 			parser.validate();
-
 			Set<ConfigurationClass> configClasses = new LinkedHashSet<>(parser.getConfigurationClasses());
 			configClasses.removeAll(alreadyParsed);
-
-			// Read the model and create bean definitions based on its content
 			if (this.reader == null) {
 				this.reader = new ConfigurationClassBeanDefinitionReader(
 						registry, this.sourceExtractor, this.resourceLoader, this.environment,
 						this.importBeanNameGenerator, parser.getImportRegistry());
 			}
+			//注册ConfigurationClass类衍生的bean，其中衍生bean中包括我们的主角RequestMappingHandlerMapping
+			//RequestMappingHandlerMapping主要是有WebMvcAutoConfiguration配置类的内部类EnableWebMvcConfiguration配置类生成
 			this.reader.loadBeanDefinitions(configClasses);
 			alreadyParsed.addAll(configClasses);
-
+            //..........
 			candidates.clear();
 			if (registry.getBeanDefinitionCount() > candidateNames.length) {
 				String[] newCandidateNames = registry.getBeanDefinitionNames();

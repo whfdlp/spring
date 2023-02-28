@@ -126,9 +126,12 @@ public class RequestResponseBodyMethodProcessor extends AbstractMessageConverter
 	@Override
 	public Object resolveArgument(MethodParameter parameter, @Nullable ModelAndViewContainer mavContainer,
 			NativeWebRequest webRequest, @Nullable WebDataBinderFactory binderFactory) throws Exception {
-
+        //获取parameter
 		parameter = parameter.nestedIfOptional();
+		//parameter类型转换，parameter.getNestedGenericParameterType()在启动的时注册处理器映射时
+		//由AbstractHandlerMethodMapping#createHandlerMethod设置
 		Object arg = readWithMessageConverters(webRequest, parameter, parameter.getNestedGenericParameterType());
+		//获取参数名
 		String name = Conventions.getVariableNameForParameter(parameter);
 
 		if (binderFactory != null) {
@@ -143,7 +146,7 @@ public class RequestResponseBodyMethodProcessor extends AbstractMessageConverter
 				mavContainer.addAttribute(BindingResult.MODEL_KEY_PREFIX + name, binder.getBindingResult());
 			}
 		}
-
+        //是否需要Optional包装，判断是否是Optional类型，是的话进行包装
 		return adaptArgumentIfNecessary(arg, parameter);
 	}
 
@@ -153,8 +156,9 @@ public class RequestResponseBodyMethodProcessor extends AbstractMessageConverter
 
 		HttpServletRequest servletRequest = webRequest.getNativeRequest(HttpServletRequest.class);
 		Assert.state(servletRequest != null, "No HttpServletRequest");
+		//将request进行包装，提供额外的功能方法等
 		ServletServerHttpRequest inputMessage = new ServletServerHttpRequest(servletRequest);
-
+        //解析参数值封装到参数中
 		Object arg = readWithMessageConverters(inputMessage, parameter, paramType);
 		if (arg == null && checkRequired(parameter)) {
 			throw new HttpMessageNotReadableException("Required request body is missing: " +
@@ -172,12 +176,13 @@ public class RequestResponseBodyMethodProcessor extends AbstractMessageConverter
 	public void handleReturnValue(@Nullable Object returnValue, MethodParameter returnType,
 			ModelAndViewContainer mavContainer, NativeWebRequest webRequest)
 			throws IOException, HttpMediaTypeNotAcceptableException, HttpMessageNotWritableException {
-
+        //设置请求已处理，不需要SpringMVC再处理页面跳转逻辑
 		mavContainer.setRequestHandled(true);
+		//对请求进行二次封装，分别创建请求对象ServletServerHttpRequest和响应对象ServletServerHttpResponse
 		ServletServerHttpRequest inputMessage = createInputMessage(webRequest);
 		ServletServerHttpResponse outputMessage = createOutputMessage(webRequest);
 
-		// Try even with null return value. ResponseBodyAdvice could get involved.
+		// 将返回值，返回值类型，以及请求响应，使用转换器进行写出
 		writeWithMessageConverters(returnValue, returnType, inputMessage, outputMessage);
 	}
 

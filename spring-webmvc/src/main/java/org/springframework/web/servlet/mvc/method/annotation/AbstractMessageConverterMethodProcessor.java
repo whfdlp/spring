@@ -169,20 +169,25 @@ public abstract class AbstractMessageConverterMethodProcessor extends AbstractMe
 			throws IOException, HttpMediaTypeNotAcceptableException, HttpMessageNotWritableException {
 
 		Object body;
+		//我们的返回值value的类型
 		Class<?> valueType;
+		//最终要转换写入的数据类型
 		Type targetType;
-
+        //根据value的类型进行绑定
 		if (value instanceof CharSequence) {
+			//我的demo返回的是String类型，所以走到这里
 			body = value.toString();
 			valueType = String.class;
 			targetType = String.class;
 		}
 		else {
+			//如果是自定义java类，则走这里
 			body = value;
 			valueType = getReturnValueType(body, returnType);
 			targetType = GenericTypeResolver.resolveType(getGenericType(returnType), returnType.getContainingClass());
 		}
 
+		//判断返回值是否为Resource类型的，如果是就处理流数据（stream）
 		if (isResourceType(value, returnType)) {
 			outputMessage.getHeaders().set(HttpHeaders.ACCEPT_RANGES, "bytes");
 			if (value != null && inputMessage.getHeaders().getFirst(HttpHeaders.RANGE) != null &&
@@ -202,18 +207,25 @@ public abstract class AbstractMessageConverterMethodProcessor extends AbstractMe
 			}
 		}
 
+		//内容协商
+		//选择合适的接收类型返回给浏览器
 		MediaType selectedMediaType = null;
+		//首先从响应头中获取合适的接受类型
 		MediaType contentType = outputMessage.getHeaders().getContentType();
 		boolean isContentTypePreset = contentType != null && contentType.isConcrete();
 		if (isContentTypePreset) {
 			if (logger.isDebugEnabled()) {
 				logger.debug("Found 'Content-Type:" + contentType + "' in response");
 			}
+			//能获取到的话就是用该类型
 			selectedMediaType = contentType;
 		}
 		else {
+			//如果响应头里面没有合适的接收类型，从请求头中获取可以接收的类型，比如从header中获取
 			HttpServletRequest request = inputMessage.getServletRequest();
 			List<MediaType> acceptableTypes = getAcceptableMediaTypes(request);
+
+			//获取服务器可以支持的接收类型
 			List<MediaType> producibleTypes = getProducibleMediaTypes(request, valueType, targetType);
 
 			if (body != null && producibleTypes.isEmpty()) {
@@ -221,6 +233,8 @@ public abstract class AbstractMessageConverterMethodProcessor extends AbstractMe
 						"No converter found for return value of type: " + valueType);
 			}
 			List<MediaType> mediaTypesToUse = new ArrayList<>();
+
+			//循环匹配合适的接收类型
 			for (MediaType requestedType : acceptableTypes) {
 				for (MediaType producibleType : producibleTypes) {
 					if (requestedType.isCompatibleWith(producibleType)) {
@@ -228,6 +242,7 @@ public abstract class AbstractMessageConverterMethodProcessor extends AbstractMe
 					}
 				}
 			}
+			//没有找到合适的接收类型，抛出异常
 			if (mediaTypesToUse.isEmpty()) {
 				if (body != null) {
 					throw new HttpMediaTypeNotAcceptableException(producibleTypes);
@@ -238,6 +253,7 @@ public abstract class AbstractMessageConverterMethodProcessor extends AbstractMe
 				return;
 			}
 
+			//将合适的媒体类型进行排序，获取最优的返回媒体类型
 			MediaType.sortBySpecificityAndQuality(mediaTypesToUse);
 
 			for (MediaType mediaType : mediaTypesToUse) {
@@ -256,7 +272,9 @@ public abstract class AbstractMessageConverterMethodProcessor extends AbstractMe
 						acceptableTypes + " and supported " + producibleTypes);
 			}
 		}
-
+        // 开始转换返回值的类型，因为demo返回的是String类型，
+		// 所以匹配到的转换器是：org.springframework.http.converter.StringHttpMessageConverter
+		// 项目一般使用的就是String和自定义的java类，所以其他的也不用考虑，又兴趣的可以深入了解下
 		if (selectedMediaType != null) {
 			selectedMediaType = selectedMediaType.removeQualityValue();
 			for (HttpMessageConverter<?> converter : this.messageConverters) {
@@ -274,9 +292,11 @@ public abstract class AbstractMessageConverterMethodProcessor extends AbstractMe
 								"Writing [" + LogFormatUtils.formatValue(theBody, !traceOn) + "]");
 						addContentDispositionHeader(inputMessage, outputMessage);
 						if (genericConverter != null) {
+							//转换特定返回类型，比如自定义的java封装对象。
 							genericConverter.write(body, targetType, selectedMediaType, outputMessage);
 						}
 						else {
+							//AbstractHttpMessageConverter
 							((HttpMessageConverter) converter).write(body, selectedMediaType, outputMessage);
 						}
 					}

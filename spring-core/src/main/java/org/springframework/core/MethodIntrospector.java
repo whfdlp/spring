@@ -59,7 +59,6 @@ public final class MethodIntrospector {
 		final Map<Method, T> methodMap = new LinkedHashMap<>();
 		Set<Class<?>> handlerTypes = new LinkedHashSet<>();
 		Class<?> specificHandlerType = null;
-
 		if (!Proxy.isProxyClass(targetType)) {
 			specificHandlerType = ClassUtils.getUserClass(targetType);
 			handlerTypes.add(specificHandlerType);
@@ -68,19 +67,22 @@ public final class MethodIntrospector {
 
 		for (Class<?> currentHandlerType : handlerTypes) {
 			final Class<?> targetClass = (specificHandlerType != null ? specificHandlerType : currentHandlerType);
-
+            //先通过反射获取所有的方法Method对象，再对获取到的方法Method对象进行封装
 			ReflectionUtils.doWithMethods(currentHandlerType, method -> {
+				//第二层回调MethodCallback接口的内部实现类
 				Method specificMethod = ClassUtils.getMostSpecificMethod(method, targetClass);
+				//获取到@RequetMapping的方法，回调第一层函数MetadataLookup的内部实现类，
+				// 封装成RequestMappingInfo类的实现，T为RequestMappingInfo
 				T result = metadataLookup.inspect(specificMethod);
 				if (result != null) {
 					Method bridgedMethod = BridgeMethodResolver.findBridgedMethod(specificMethod);
 					if (bridgedMethod == specificMethod || metadataLookup.inspect(bridgedMethod) == null) {
+						//将Method对象作为key，RequestMappingInfo作为value存入map映射
 						methodMap.put(specificMethod, result);
 					}
 				}
 			}, ReflectionUtils.USER_DECLARED_METHODS);
 		}
-
 		return methodMap;
 	}
 

@@ -199,9 +199,11 @@ public abstract class AbstractMessageConverterMethodArgumentResolver implements 
 						(converter instanceof GenericHttpMessageConverter ? (GenericHttpMessageConverter<?>) converter : null);
 				if (genericConverter != null ? genericConverter.canRead(targetType, contextClass, contentType) :
 						(targetClass != null && converter.canRead(targetClass, contentType))) {
+					//request中是否有请求值
 					if (message.hasBody()) {
 						HttpInputMessage msgToUse =
 								getAdvice().beforeBodyRead(message, parameter, targetType, converterType);
+						//依赖jackson,通过jackson读取请求body并转换为参数值绑定到参数上
 						body = (genericConverter != null ? genericConverter.read(targetType, contextClass, msgToUse) :
 								((HttpMessageConverter<T>) converter).read(targetClass, msgToUse));
 						body = getAdvice().afterBodyRead(body, msgToUse, parameter, targetType, converterType);

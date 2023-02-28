@@ -178,14 +178,21 @@ public class RequestMappingHandlerMapping extends RequestMappingInfoHandlerMappi
 	@Override
 	@SuppressWarnings("deprecation")
 	public void afterPropertiesSet() {
+		//config为RequestMappingInfo
 		this.config = new RequestMappingInfo.BuilderConfiguration();
+		//设置URL匹配器
 		this.config.setUrlPathHelper(getUrlPathHelper());
+		//设置PathMatcher，默认为AntPathMatcher，路径匹配校验器，如/*、/**、/？、/**/*
 		this.config.setPathMatcher(getPathMatcher());
+		//设置是否支持后缀补充，默认为true
 		this.config.setSuffixPatternMatch(useSuffixPatternMatch());
+		//是否添加"/"后缀，默认为true
 		this.config.setTrailingSlashMatch(useTrailingSlashMatch());
+		//是否采用mediaType匹配模式，比如.json/.xml模式的匹配，默认为false
 		this.config.setRegisteredSuffixPatternMatch(useRegisteredSuffixPatternMatch());
+		//mediaType处理类，如gif、jpeg、form-data、xml等等
 		this.config.setContentNegotiationManager(getContentNegotiationManager());
-
+        //调用父类AbstractHandlerMethodMapping方法，扫描容器中的bean，检测并注册HandlerMethod
 		super.afterPropertiesSet();
 	}
 

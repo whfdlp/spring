@@ -119,15 +119,18 @@ public class DefaultBeanDefinitionDocumentReader implements BeanDefinitionDocume
 	 */
 	@SuppressWarnings("deprecation")  // for Environment.acceptsProfiles(String...)
 	protected void doRegisterBeanDefinitions(Element root) {
-		// Any nested <beans> elements will cause recursion in this method. In
-		// order to propagate and preserve <beans> default-* attributes correctly,
-		// keep track of the current (parent) delegate, which may be null. Create
-		// the new (child) delegate with a reference to the parent for fallback purposes,
-		// then ultimately reset this.delegate back to its original (parent) reference.
-		// this behavior emulates a stack of delegates without actually necessitating one.
+        //因为有嵌套bean标签<beans>，该方法会被递归回调，所以将当前解析delegate付给parent对象，在新建一个delegate去解析
 		BeanDefinitionParserDelegate parent = this.delegate;
 		this.delegate = createDelegate(getReaderContext(), root, parent);
 
+		/**
+		 * 主要校验<beans>标签的profile属性，profile主要用于环境隔离，可以有多个环境，多套配置
+		 * 通过ClassPathXmlApplicationContext.getEnvironment().setActiveProfiles("test")
+		 * 决定使用那一套配置，如果没有设置则不解析
+		 * <beans profile="test">
+		 *    <bean id="dataSource" ...></bean>
+		 *</beans>
+		 */
 		if (this.delegate.isDefaultNamespace(root)) {
 			String profileSpec = root.getAttribute(PROFILE_ATTRIBUTE);
 			if (StringUtils.hasText(profileSpec)) {
@@ -144,11 +147,13 @@ public class DefaultBeanDefinitionDocumentReader implements BeanDefinitionDocume
 				}
 			}
 		}
-
+        //空实现，模版方法模式，留给子类扩展
 		preProcessXml(root);
+		//解析
 		parseBeanDefinitions(root, this.delegate);
+		//空实现，模版方法模式，留给子类扩展
 		postProcessXml(root);
-
+        //解析完成重新将原来的delegate赋值回来去解析
 		this.delegate = parent;
 	}
 
@@ -166,15 +171,20 @@ public class DefaultBeanDefinitionDocumentReader implements BeanDefinitionDocume
 	 * @param root the DOM root element of the document
 	 */
 	protected void parseBeanDefinitions(Element root, BeanDefinitionParserDelegate delegate) {
+		//判断是否是默认的命名空间标签，比如<beans>,<bean>等spring自带的标签，
+		// 如果不是就进入else标签中，比如dubbo的<dubbo:service>,由dubbo自己去解析
 		if (delegate.isDefaultNamespace(root)) {
+			//获取所有子结点，去遍历解析
 			NodeList nl = root.getChildNodes();
 			for (int i = 0; i < nl.getLength(); i++) {
 				Node node = nl.item(i);
 				if (node instanceof Element) {
 					Element ele = (Element) node;
+					//如果是spring标签，就直接处理
 					if (delegate.isDefaultNamespace(ele)) {
 						parseDefaultElement(ele, delegate);
 					}
+					//如果不是spring的标签，则找对应的标签解析器去解析
 					else {
 						delegate.parseCustomElement(ele);
 					}
@@ -182,20 +192,27 @@ public class DefaultBeanDefinitionDocumentReader implements BeanDefinitionDocume
 			}
 		}
 		else {
+			//如果不是spring默认标签，则找对应的标签解析器去解析
 			delegate.parseCustomElement(root);
 		}
 	}
 
 	private void parseDefaultElement(Element ele, BeanDefinitionParserDelegate delegate) {
+		//如果是import标签，如<import>...</import>;会继续调用loadBeanDefinitions方法，
+		// 也就是最终还是调用doRegisterBeanDefinitions方法
 		if (delegate.nodeNameEquals(ele, IMPORT_ELEMENT)) {
 			importBeanDefinitionResource(ele);
 		}
+		//如果是alias标签的话，如<alias name="person" alias="person2"/>，
+		//会解析出name和alias最终以alias为key，name为value注册到容器的aliasMap中
 		else if (delegate.nodeNameEquals(ele, ALIAS_ELEMENT)) {
 			processAliasRegistration(ele);
 		}
+		//如果是bean标签的话，如<bean>...</bean>就去解析bean
 		else if (delegate.nodeNameEquals(ele, BEAN_ELEMENT)) {
 			processBeanDefinition(ele, delegate);
 		}
+		//如果是嵌套bean标签，如<beans>...</beans>则直接递归doRegisterBeanDefinitions继续解析
 		else if (delegate.nodeNameEquals(ele, NESTED_BEANS_ELEMENT)) {
 			// recurse
 			doRegisterBeanDefinitions(ele);
@@ -298,23 +315,22 @@ public class DefaultBeanDefinitionDocumentReader implements BeanDefinitionDocume
 		}
 	}
 
-	/**
-	 * Process the given bean element, parsing the bean definition
-	 * and registering it with the registry.
-	 */
+	//处理bean节点，解析beanDefinition并注册
 	protected void processBeanDefinition(Element ele, BeanDefinitionParserDelegate delegate) {
+		//解析，并返回BeanDefinitionHolder，BeanDefinitionHolder是BeanDefinition的封装类，持有BeanDefinition。
 		BeanDefinitionHolder bdHolder = delegate.parseBeanDefinitionElement(ele);
 		if (bdHolder != null) {
+			//对bean标签进行进一步的处理，主要用于bean标签中使用了自定义标签的场景
 			bdHolder = delegate.decorateBeanDefinitionIfRequired(ele, bdHolder);
 			try {
-				// Register the final decorated instance.
+				// 注册最终生成的bdHolder
 				BeanDefinitionReaderUtils.registerBeanDefinition(bdHolder, getReaderContext().getRegistry());
 			}
 			catch (BeanDefinitionStoreException ex) {
 				getReaderContext().error("Failed to register bean definition with name '" +
 						bdHolder.getBeanName() + "'", ele, ex);
 			}
-			// Send registration event.
+			// 发送当前bdHolder注册完成事件
 			getReaderContext().fireComponentRegistered(new BeanComponentDefinition(bdHolder));
 		}
 	}

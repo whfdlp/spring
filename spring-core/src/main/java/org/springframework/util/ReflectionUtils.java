@@ -354,22 +354,25 @@ public abstract class ReflectionUtils {
 	 * @throws IllegalStateException if introspection fails
 	 */
 	public static void doWithMethods(Class<?> clazz, MethodCallback mc, @Nullable MethodFilter mf) {
-		// Keep backing up the inheritance hierarchy.
+		// 获取Controller类的所有方法，并循环遍历
 		Method[] methods = getDeclaredMethods(clazz, false);
 		for (Method method : methods) {
 			if (mf != null && !mf.matches(method)) {
 				continue;
 			}
 			try {
+				//回调第二层函数MethodCallback的内部实现类，将Method对象作为key，RequestMappingInfo作为value存入map映射
 				mc.doWith(method);
 			}
 			catch (IllegalAccessException ex) {
 				throw new IllegalStateException("Not allowed to access method '" + method.getName() + "': " + ex);
 			}
 		}
+		//如果有父类，对父类也进行method映射处理,递归调用
 		if (clazz.getSuperclass() != null && (mf != USER_DECLARED_METHODS || clazz.getSuperclass() != Object.class)) {
 			doWithMethods(clazz.getSuperclass(), mc, mf);
 		}
+		//如果是接口，获取到所有的实现接口，进行method映射处理，递归调用
 		else if (clazz.isInterface()) {
 			for (Class<?> superIfc : clazz.getInterfaces()) {
 				doWithMethods(superIfc, mc, mf);

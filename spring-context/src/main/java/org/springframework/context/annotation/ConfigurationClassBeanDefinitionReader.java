@@ -114,6 +114,9 @@ class ConfigurationClassBeanDefinitionReader {
 	 * Read {@code configurationModel}, registering bean definitions
 	 * with the registry based on its contents.
 	 */
+	//遍历读取配置类，并将衍生的beanDefinitions注册到容器中
+	//此时我们关注一个WebMvcAutoConfiguration$EnableWebMvcConfiguration配置类
+	//EnableWebMvcConfiguration为WebMvcAutoConfiguration的内部类
 	public void loadBeanDefinitions(Set<ConfigurationClass> configurationModel) {
 		TrackedConditionEvaluator trackedConditionEvaluator = new TrackedConditionEvaluator();
 		for (ConfigurationClass configClass : configurationModel) {
@@ -140,6 +143,7 @@ class ConfigurationClassBeanDefinitionReader {
 		if (configClass.isImported()) {
 			registerBeanDefinitionForImportedConfigurationClass(configClass);
 		}
+		//读取配置类中的@Bean注解,并注册beanDefinition
 		for (BeanMethod beanMethod : configClass.getBeanMethods()) {
 			loadBeanDefinitionsForBeanMethod(beanMethod);
 		}

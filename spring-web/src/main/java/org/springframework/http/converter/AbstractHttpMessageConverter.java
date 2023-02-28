@@ -206,7 +206,7 @@ public abstract class AbstractHttpMessageConverter<T> implements HttpMessageConv
 	@Override
 	public final void write(final T t, @Nullable MediaType contentType, HttpOutputMessage outputMessage)
 			throws IOException, HttpMessageNotWritableException {
-
+        //添加header
 		final HttpHeaders headers = outputMessage.getHeaders();
 		addDefaultHeaders(headers, t, contentType);
 
@@ -224,7 +224,9 @@ public abstract class AbstractHttpMessageConverter<T> implements HttpMessageConv
 			}));
 		}
 		else {
+			//将返回值写出到响应对象中
 			writeInternal(t, outputMessage);
+			//刷空输出流，并输出所有被缓存的字节。由于某些流支持缓存功能，该方法将把缓存中所有内容强制输出到流中。
 			outputMessage.getBody().flush();
 		}
 	}

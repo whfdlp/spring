@@ -118,7 +118,7 @@ public class RequestMappingHandlerAdapter extends AbstractHandlerMethodAdapter
 	/**
 	 * MethodFilter that matches {@link InitBinder @InitBinder} methods.
 	 */
-	public static final MethodFilter INIT_BINDER_METHODS = method ->
+	public static final MethodFilter INIT_BINDER_METHODS =method ->
 			AnnotatedElementUtils.hasAnnotation(method, InitBinder.class);
 
 	/**
@@ -771,9 +771,11 @@ public class RequestMappingHandlerAdapter extends AbstractHandlerMethodAdapter
 			HttpServletResponse response, HandlerMethod handlerMethod) throws Exception {
 
 		ModelAndView mav;
+		//校验，请求方式是否支持，是否需要验证Session
 		checkRequest(request);
 
-		// Execute invokeHandlerMethod in synchronized block if required.
+		// synchronizeOnSession可配置参数，如果指定为true，服务器只分配一个线程给该用户，确保安全，默认为false
+		// 一般不会走这里
 		if (this.synchronizeOnSession) {
 			HttpSession session = request.getSession(false);
 			if (session != null) {
@@ -788,7 +790,7 @@ public class RequestMappingHandlerAdapter extends AbstractHandlerMethodAdapter
 			}
 		}
 		else {
-			// No synchronization on session demanded at all...
+			// synchronizeOnSession为false时，直接执行调用
 			mav = invokeHandlerMethod(request, response, handlerMethod);
 		}
 
@@ -834,22 +836,29 @@ public class RequestMappingHandlerAdapter extends AbstractHandlerMethodAdapter
 	@Nullable
 	protected ModelAndView invokeHandlerMethod(HttpServletRequest request,
 			HttpServletResponse response, HandlerMethod handlerMethod) throws Exception {
-
+        //封装request，response为ServletWebRequest
 		ServletWebRequest webRequest = new ServletWebRequest(request, response);
 		try {
+			//binderFactory为工厂模式，主要用来生成WebDataBinder对象，WebDataBinder的作用是将请求的参数值设置到对象的属性中进行绑定。
 			WebDataBinderFactory binderFactory = getDataBinderFactory(handlerMethod);
 			ModelFactory modelFactory = getModelFactory(handlerMethod, binderFactory);
 
 			ServletInvocableHandlerMethod invocableMethod = createInvocableHandlerMethod(handlerMethod);
+			// argumentResolvers内置了HandlerMethodArgumentResolver请求参数解析器，用于将请求参数按照接口接收的类型进行封装，
+			// 例如使用@RequestBody注解的解析器RequestResponseBodyMethodProcessor，使用@RequestParam注解的解析器RequestParamMethodArgumentResolver等
 			if (this.argumentResolvers != null) {
 				invocableMethod.setHandlerMethodArgumentResolvers(this.argumentResolvers);
 			}
+			//returnValueHandlers内置了HandlerMethodReturnValueHandler返回参数处理器，用于响应数据的封装处理
+			//例如ModelAndView、String、Map、@ResponseBody标记的方法等等，同请求参数解析器一样都有对应的处理器来处理
 			if (this.returnValueHandlers != null) {
 				invocableMethod.setHandlerMethodReturnValueHandlers(this.returnValueHandlers);
 			}
+			//设置binderFactory为工厂
 			invocableMethod.setDataBinderFactory(binderFactory);
+			//设置参数名解析器，主要用于HandlerMethodArgumentResolver请求参数解析器解析的值与名字映射，最终通过WebDataBinder进行关联
 			invocableMethod.setParameterNameDiscoverer(this.parameterNameDiscoverer);
-
+            //顾名思义是一个容器，保存了从请求到响应的一系列参数及值，比如请求参数，响应参数，响应结果，请求是否处理完，对应视图信息等等
 			ModelAndViewContainer mavContainer = new ModelAndViewContainer();
 			mavContainer.addAllAttributes(RequestContextUtils.getInputFlashMap(request));
 			modelFactory.initModel(webRequest, mavContainer, invocableMethod);
@@ -858,6 +867,7 @@ public class RequestMappingHandlerAdapter extends AbstractHandlerMethodAdapter
 			AsyncWebRequest asyncWebRequest = WebAsyncUtils.createAsyncWebRequest(request, response);
 			asyncWebRequest.setTimeout(this.asyncRequestTimeout);
 
+			//用于管理异步请求处理的中心类，主要用作SPI，通常不由应用程序类直接使用，可以直接跳过
 			WebAsyncManager asyncManager = WebAsyncUtils.getAsyncManager(request);
 			asyncManager.setTaskExecutor(this.taskExecutor);
 			asyncManager.setAsyncWebRequest(asyncWebRequest);
@@ -875,11 +885,12 @@ public class RequestMappingHandlerAdapter extends AbstractHandlerMethodAdapter
 				invocableMethod = invocableMethod.wrapConcurrentResult(result);
 			}
 
+            //执行调用
 			invocableMethod.invokeAndHandle(webRequest, mavContainer);
 			if (asyncManager.isConcurrentHandlingStarted()) {
 				return null;
 			}
-
+            //返回视图
 			return getModelAndView(mavContainer, modelFactory, webRequest);
 		}
 		finally {
@@ -985,9 +996,13 @@ public class RequestMappingHandlerAdapter extends AbstractHandlerMethodAdapter
 			ModelFactory modelFactory, NativeWebRequest webRequest) throws Exception {
 
 		modelFactory.updateModel(webRequest, mavContainer);
+		// 判断是否需要返回视图
+		// 如果是@RequestBody注解对应的处理器时，返回的为json对象，不需要返回视图，就会设置mavContainer.isRequestHandled()为true
+		// 后续流程中就不需要视图渲染
 		if (mavContainer.isRequestHandled()) {
 			return null;
 		}
+		// 需要返回视图的话，例如我们的Controller对应的处理器没有指定返回什么类型，则根据处理器方法返回对应的视图。
 		ModelMap model = mavContainer.getModel();
 		ModelAndView mav = new ModelAndView(mavContainer.getViewName(), model, mavContainer.getStatus());
 		if (!mavContainer.isViewReference()) {

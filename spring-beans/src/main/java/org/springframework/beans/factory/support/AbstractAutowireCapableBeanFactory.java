@@ -590,7 +590,9 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 		// Initialize the bean instance.
 		Object exposedObject = bean;
 		try {
+			//装载bean，属性填充
 			populateBean(beanName, mbd, instanceWrapper);
+			//调用bean的初始化方法，以及对实现了Aware类型的的接口处理
 			exposedObject = initializeBean(beanName, exposedObject, mbd);
 		}
 		catch (Throwable ex) {
@@ -1776,33 +1778,33 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 	 * @see #applyBeanPostProcessorsAfterInitialization
 	 */
 	protected Object initializeBean(String beanName, Object bean, @Nullable RootBeanDefinition mbd) {
+		//实现了Aware接口的逻辑处理
 		if (System.getSecurityManager() != null) {
 			AccessController.doPrivileged((PrivilegedAction<Object>) () -> {
 				invokeAwareMethods(beanName, bean);
 				return null;
 			}, getAccessControlContext());
-		}
-		else {
+		}else {
 			invokeAwareMethods(beanName, bean);
 		}
 
 		Object wrappedBean = bean;
+		//执行初始化方法之前的前置处理，可以配置注册BeanPostProcessor，对bean进行修改
 		if (mbd == null || !mbd.isSynthetic()) {
 			wrappedBean = applyBeanPostProcessorsBeforeInitialization(wrappedBean, beanName);
 		}
 
 		try {
+			//执行初始化方法，比如配置的init_method、如果bean实现了InitializingBean，执行afterPropertiesSet()方法
 			invokeInitMethods(beanName, wrappedBean, mbd);
-		}
-		catch (Throwable ex) {
-			throw new BeanCreationException(
-					(mbd != null ? mbd.getResourceDescription() : null),
+		}catch (Throwable ex) {
+			throw new BeanCreationException((mbd != null ? mbd.getResourceDescription() : null),
 					beanName, "Invocation of init method failed", ex);
 		}
+		//执行初始化方法之后的后置处理，可以配置注册BeanPostProcessor，对bean进行修改
 		if (mbd == null || !mbd.isSynthetic()) {
 			wrappedBean = applyBeanPostProcessorsAfterInitialization(wrappedBean, beanName);
 		}
-
 		return wrappedBean;
 	}
 
@@ -1855,6 +1857,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 				}
 			}
 			else {
+				//如果bean实现了InitializingBean,spring会调用afterPropertiesSet()进行bean的其他设置
 				((InitializingBean) bean).afterPropertiesSet();
 			}
 		}

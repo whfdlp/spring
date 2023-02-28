@@ -81,6 +81,11 @@ public class ClassPathXmlApplicationContext extends AbstractXmlApplicationContex
 	 * @param configLocation resource location
 	 * @throws BeansException if context creation failed
 	 */
+	/**
+	 * 构造器
+	 * @param configLocation：配置文件地址
+	 * @throws BeansException
+	 */
 	public ClassPathXmlApplicationContext(String configLocation) throws BeansException {
 		this(new String[] {configLocation}, true, null);
 	}
@@ -137,10 +142,15 @@ public class ClassPathXmlApplicationContext extends AbstractXmlApplicationContex
 	public ClassPathXmlApplicationContext(
 			String[] configLocations, boolean refresh, @Nullable ApplicationContext parent)
 			throws BeansException {
-
+		/**
+		 * 设置父容器，当获取bean实例的时候，如果当前容器没有就去父容器中获取
+		 * 此处为null，不用处理
+		 */
 		super(parent);
+		//设置配置文件
 		setConfigLocations(configLocations);
 		if (refresh) {
+			//refresh为true，功能刷新
 			refresh();
 		}
 	}

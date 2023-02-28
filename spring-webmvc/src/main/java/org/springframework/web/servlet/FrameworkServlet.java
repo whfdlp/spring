@@ -520,31 +520,15 @@ public abstract class FrameworkServlet extends HttpServletBean implements Applic
 	 */
 	@Override
 	protected final void initServletBean() throws ServletException {
-		getServletContext().log("Initializing Spring " + getClass().getSimpleName() + " '" + getServletName() + "'");
-		if (logger.isInfoEnabled()) {
-			logger.info("Initializing Servlet '" + getServletName() + "'");
-		}
-		long startTime = System.currentTimeMillis();
-
 		try {
+			//初始化web容器，核心逻辑
 			this.webApplicationContext = initWebApplicationContext();
+			//模版方法模式，留给子类扩展
 			initFrameworkServlet();
 		}
 		catch (ServletException | RuntimeException ex) {
 			logger.error("Context initialization failed", ex);
 			throw ex;
-		}
-
-		if (logger.isDebugEnabled()) {
-			String value = this.enableLoggingRequestDetails ?
-					"shown which may lead to unsafe logging of potentially sensitive data" :
-					"masked to prevent unsafe logging of potentially sensitive data";
-			logger.debug("enableLoggingRequestDetails='" + this.enableLoggingRequestDetails +
-					"': request parameters and headers will be " + value);
-		}
-
-		if (logger.isInfoEnabled()) {
-			logger.info("Completed initialization in " + (System.currentTimeMillis() - startTime) + " ms");
 		}
 	}
 
@@ -558,44 +542,46 @@ public abstract class FrameworkServlet extends HttpServletBean implements Applic
 	 * @see #setContextConfigLocation
 	 */
 	protected WebApplicationContext initWebApplicationContext() {
+		// 先获取父类容器，用来设置当前容器的父容器。
+		// 因为我是SpringBoot项目，所以容器是AnnotationConfigServletWebServerApplicationContext
 		WebApplicationContext rootContext =
 				WebApplicationContextUtils.getWebApplicationContext(getServletContext());
 		WebApplicationContext wac = null;
 
 		if (this.webApplicationContext != null) {
-			// A context instance was injected at construction time -> use it
+			// 如果当前容器已经存在，就使用该容器
+			// 我debug过来，容器仍是AnnotationConfigServletWebServerApplicationContext，同rootContext，是同一个对象
 			wac = this.webApplicationContext;
 			if (wac instanceof ConfigurableWebApplicationContext) {
 				ConfigurableWebApplicationContext cwac = (ConfigurableWebApplicationContext) wac;
+				// 判断该容器是否刷新过，是AbstractApplicationContext的一个变量，调用refresh时设置为true
+				// 即是否调用过refresh方法,这里直接跳出if判断，走下一个逻辑，因为springboot在启动的时候会调用
 				if (!cwac.isActive()) {
-					// The context has not yet been refreshed -> provide services such as
-					// setting the parent context, setting the application context id, etc
+					// 如果父容器为空，设置父容器，该逻辑在这里不会走
 					if (cwac.getParent() == null) {
-						// The context instance was injected without an explicit parent -> set
-						// the root application context (if any; may be null) as the parent
 						cwac.setParent(rootContext);
 					}
+					// 配置并刷新容器，该逻辑在这里不会走
 					configureAndRefreshWebApplicationContext(cwac);
 				}
 			}
 		}
 		if (wac == null) {
-			// No context instance was injected at construction time -> see if one
-			// has been registered in the servlet context. If one exists, it is assumed
-			// that the parent context (if any) has already been set and that the
-			// user has performed any initialization such as setting the context id
+			//容器不存在，就通过FrameworkServlet的属性contextAttribute找容器
 			wac = findWebApplicationContext();
 		}
 		if (wac == null) {
-			// No context instance is defined for this servlet -> create a local one
+			// 容器仍不存在的话，创建一个容器
 			wac = createWebApplicationContext(rootContext);
 		}
 
+		// refreshEventReceived默认为false
+		// refreshEventReceived在FrameworkServlet的内部类ContextRefreshListener监听ContextRefreshedEvent事件设置为true的
+		// 但在Springboot项目启动的时候并没有将该监听器添加进去，所以ContextRefreshListener的onApplicationEvent方法最终没有被调用
+		// 该监听器可能是在哪里配置的，所以没有被加载进ContextRefreshedEvent监听器集合中，这里我们不深究，
 		if (!this.refreshEventReceived) {
-			// Either the context is not a ConfigurableApplicationContext with refresh
-			// support or the context injected at construction time had already been
-			// refreshed -> trigger initial onRefresh manually here.
 			synchronized (this.onRefreshMonitor) {
+				// 模版方法，空实现，留给子类去覆写扩展
 				onRefresh(wac);
 			}
 		}
@@ -874,12 +860,13 @@ public abstract class FrameworkServlet extends HttpServletBean implements Applic
 	@Override
 	protected void service(HttpServletRequest request, HttpServletResponse response)
 			throws ServletException, IOException {
-
+        //因为HttpServlet不能处理PATCH类型请求，所以直接交给FrameworkServlet处理
 		HttpMethod httpMethod = HttpMethod.resolve(request.getMethod());
 		if (httpMethod == HttpMethod.PATCH || httpMethod == null) {
 			processRequest(request, response);
 		}
 		else {
+			//其他的如GET、POST、DELETE等类型的请求，HttpServlet都支持，所以先由HttpServlet处理
 			super.service(request, response);
 		}
 	}
