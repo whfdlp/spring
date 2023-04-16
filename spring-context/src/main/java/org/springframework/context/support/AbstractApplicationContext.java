@@ -658,7 +658,6 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 		beanFactory.ignoreDependencyInterface(MessageSourceAware.class);
 		beanFactory.ignoreDependencyInterface(ApplicationContextAware.class);
 
-
 		//设置依赖注入的值，保存到resolvableDependencies中，底层是Map结构，将
 		//BeanFactory、ResourceLoader、ApplicationEventPublisher、ApplicationContext类型作为key,对应的beanFactory等作为value
 		//在自动注入的时候，如果遇到是BeanFactory等这些类型的就自动注入为当前映射的value值，如果不这么做，比如BeanFactory是有多个实现类的，
