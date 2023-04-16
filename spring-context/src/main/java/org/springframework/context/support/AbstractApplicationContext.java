@@ -658,24 +658,32 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 		beanFactory.ignoreDependencyInterface(MessageSourceAware.class);
 		beanFactory.ignoreDependencyInterface(ApplicationContextAware.class);
 
-		// BeanFactory interface not registered as resolvable type in a plain factory.
-		// MessageSource registered (and found for autowiring) as a bean.
+
+		//设置依赖注入的值，保存到resolvableDependencies中，底层是Map结构，将
+		//BeanFactory、ResourceLoader、ApplicationEventPublisher、ApplicationContext类型作为key,对应的beanFactory等作为value
+		//在自动注入的时候，如果遇到是BeanFactory等这些类型的就自动注入为当前映射的value值，如果不这么做，比如BeanFactory是有多个实现类的，
+		//spring在自动注入的时候是不知道该注入哪一个，就会抛出异常，同理，如果我们一个接口如果有多个实现类，在设置自动注入的时候，也是会报错
+		//这个时候就需要指明到底需要注入哪个实现类
 		beanFactory.registerResolvableDependency(BeanFactory.class, beanFactory);
 		beanFactory.registerResolvableDependency(ResourceLoader.class, this);
 		beanFactory.registerResolvableDependency(ApplicationEventPublisher.class, this);
 		beanFactory.registerResolvableDependency(ApplicationContext.class, this);
 
 		// Register early post-processor for detecting inner beans as ApplicationListeners.
+		//ApplicationListenerDetector实现了BeanPostProcessor，主要左右是在bean实例化时，如果bean属于ApplicationListener
+		//则将bean加入到IOC容器的applicationListeners变量中
 		beanFactory.addBeanPostProcessor(new ApplicationListenerDetector(this));
 
 		// Detect a LoadTimeWeaver and prepare for weaving, if found.
 		if (beanFactory.containsBean(LOAD_TIME_WEAVER_BEAN_NAME)) {
+			//LoadTimeWeaverAwareProcessor用于AOP，也是dBeanPostProcessor，在bean实例化时设置LoadTimeWeaver属性
 			beanFactory.addBeanPostProcessor(new LoadTimeWeaverAwareProcessor(beanFactory));
 			// Set a temporary ClassLoader for type matching.
 			beanFactory.setTempClassLoader(new ContextTypeMatchClassLoader(beanFactory.getBeanClassLoader()));
 		}
 
 		// Register default environment beans.
+		//设置默认的系统属性到IOC容器总，分别是environment、systemProperties、systemEnvironment
 		if (!beanFactory.containsLocalBean(ENVIRONMENT_BEAN_NAME)) {
 			beanFactory.registerSingleton(ENVIRONMENT_BEAN_NAME, getEnvironment());
 		}
