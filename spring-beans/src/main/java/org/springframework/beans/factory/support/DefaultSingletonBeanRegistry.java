@@ -214,8 +214,10 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	public Object getSingleton(String beanName, ObjectFactory<?> singletonFactory) {
 		Assert.notNull(beanName, "Bean name must not be null");
 		synchronized (this.singletonObjects) {
+			// 先从一级缓存中拿，存在则直接返回，不存在则创建，singletonObjects为一级缓存，存储的是最终创建完成的bean
 			Object singletonObject = this.singletonObjects.get(beanName);
 			if (singletonObject == null) {
+				//singletonsCurrentlyInDestruction是关闭容器或者容器启动失败时的标志，此时不能再继续创建bean
 				if (this.singletonsCurrentlyInDestruction) {
 					throw new BeanCreationNotAllowedException(beanName,
 							"Singleton bean creation not allowed while singletons of this factory are in destruction " +
@@ -224,6 +226,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 				if (logger.isDebugEnabled()) {
 					logger.debug("Creating shared instance of singleton bean '" + beanName + "'");
 				}
+				//底层为singletonsCurrentlyInCreation.add(beanName)，标记该bean正在创建，其他地方再创建会直接报错
 				beforeSingletonCreation(beanName);
 				boolean newSingleton = false;
 				boolean recordSuppressedExceptions = (this.suppressedExceptions == null);
@@ -231,6 +234,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 					this.suppressedExceptions = new LinkedHashSet<>();
 				}
 				try {
+					// 方法回调，执行外面调用getSingleton(String beanName, ObjectFactory<?> singletonFactory)方法的ObjectFactory内部实现类，即createBean
 					singletonObject = singletonFactory.getObject();
 					newSingleton = true;
 				}
@@ -254,12 +258,15 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 					if (recordSuppressedExceptions) {
 						this.suppressedExceptions = null;
 					}
+					//从保存创建中的set集合inCreationCheckExclusions中清除，singletonsCurrentlyInCreation.remove(beanName)，同上面的beforeSingletonCreation是一对
 					afterSingletonCreation(beanName);
 				}
 				if (newSingleton) {
+					//清除二三级缓存，并将最终的bean保存在一级缓存中，供后面直接使用
 					addSingleton(beanName, singletonObject);
 				}
 			}
+			//直接返回
 			return singletonObject;
 		}
 	}

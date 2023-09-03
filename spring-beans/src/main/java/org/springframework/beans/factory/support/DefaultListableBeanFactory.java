@@ -862,16 +862,22 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 
 	@Override
 	public void preInstantiateSingletons() throws BeansException {
-		//......
+		//拿到所有的beanDefinitionNames
 		List<String> beanNames = new ArrayList<>(this.beanDefinitionNames);
-
+		//for循环一个一个初始化
 		for (String beanName : beanNames) {
+			//根据beanName获取BeanDefinition，RootBeanDefinition是BeanDefinition的子类，
+			//getMergedLocalBeanDefinition方法顾名思义就是合并，如果指定了parent，会继承parent的属性
 			RootBeanDefinition bd = getMergedLocalBeanDefinition(beanName);
+			// 如果不是抽象类 并且 是单例的 并且 不是延迟加载 就进行初始化bean
 			if (!bd.isAbstract() && bd.isSingleton() && !bd.isLazyInit()) {
+				//判断是否是工厂bean：FactoryBean，通过beanName初始化bean对象实际上返回的是FactoryBean的getObject方法返回的对象
 				if (isFactoryBean(beanName)) {
+					// FACTORY_BEAN_PREFIX为&，加上该前缀表示获取工厂bean而不是bean包装的对象
 					Object bean = getBean(FACTORY_BEAN_PREFIX + beanName);
 					if (bean instanceof FactoryBean) {
 						FactoryBean<?> factory = (FactoryBean<?>) bean;
+						//判断是否需要立即初始化工厂bean包装的对象
 						boolean isEagerInit;
 						if (System.getSecurityManager() != null && factory instanceof SmartFactoryBean) {
 							isEagerInit = AccessController.doPrivileged(
@@ -882,15 +888,34 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 									((SmartFactoryBean<?>) factory).isEagerInit());
 						}
 						if (isEagerInit) {
+							//需要立即初始化工厂bean包装的对象是调用初始化方法getBean,此时没有加FACTORY_BEAN_PREFIX，获取的就是包装的bean
 							getBean(beanName);
 						}
 					}
 				}else {
+					//初始化普通bean
 					getBean(beanName);
 				}
 			}
 		}
-		//.......
+
+		// Trigger post-initialization callback for all applicable beans...
+		//获取所有的bean，并判断是否是SmartInitializingSingleton类型，并触发所有 SmartInitializingSingleton 后初始化回调
+		for (String beanName : beanNames) {
+			Object singletonInstance = getSingleton(beanName);
+			if (singletonInstance instanceof SmartInitializingSingleton) {
+				SmartInitializingSingleton smartSingleton = (SmartInitializingSingleton) singletonInstance;
+				if (System.getSecurityManager() != null) {
+					AccessController.doPrivileged((PrivilegedAction<Object>) () -> {
+						smartSingleton.afterSingletonsInstantiated();
+						return null;
+					}, getAccessControlContext());
+				}
+				else {
+					smartSingleton.afterSingletonsInstantiated();
+				}
+			}
+		}
 	}
 
 

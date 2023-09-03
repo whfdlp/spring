@@ -549,14 +549,11 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 				}
 				// 应用启动失败，销毁已经创建的bean
 				destroyBeans();
-
 				// 设置active标志为false
 				cancelRefresh(ex);
-
 				// 抛出异常给调用者
 				throw ex;
 			}
-
 			finally {
 				// Reset common introspection caches in Spring's core, since we
 				// might not ever need metadata for singleton beans anymore...
@@ -854,6 +851,8 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 	}
 
 	/**
+	 * 完成beanFactory的初始化
+	 * 初始化所有单例
 	 * Finish the initialization of this context's bean factory,
 	 * initializing all remaining singleton beans.
 	 */
@@ -865,24 +864,22 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 					beanFactory.getBean(CONVERSION_SERVICE_BEAN_NAME, ConversionService.class));
 		}
 
-		// Register a default embedded value resolver if no bean post-processor
-		// (such as a PropertyPlaceholderConfigurer bean) registered any before:
-		// at this point, primarily for resolution in annotation attribute values.
+		//EmbeddedValueResolver是用来处理placeholders占位符的，如果没有EmbeddedValueResolver的话注册一个默认的
 		if (!beanFactory.hasEmbeddedValueResolver()) {
 			beanFactory.addEmbeddedValueResolver(strVal -> getEnvironment().resolvePlaceholders(strVal));
 		}
 
+		//提前初始化LoadTimeWeaverAware类，LoadTimeWeaverAware属于aop范畴
 		String[] weaverAwareNames = beanFactory.getBeanNamesForType(LoadTimeWeaverAware.class, false, false);
 		for (String weaverAwareName : weaverAwareNames) {
 			getBean(weaverAwareName);
 		}
 
-		// Stop using the temporary ClassLoader for type matching.
 		beanFactory.setTempClassLoader(null);
 
 		//冻结已加载的beanDefinitionNames，不允许被修改
 		beanFactory.freezeConfiguration();
-		//初始化搜有非延迟加载单例
+		//初始化所有非延迟加载单例
 		beanFactory.preInstantiateSingletons();
 	}
 
